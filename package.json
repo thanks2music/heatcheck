@@ -1,0 +1,35 @@
+{
+  "name": "heatcheck",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Framework Trends: how much attention frameworks get on GitHub over time",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thanks2music/heatcheck.git"
+  },
+  "homepage": "https://thanks2music.github.io/heatcheck/",
+  "packageManager": "bun@1.4.4",
+  "scripts": {
+    "dev": "bun run derive && bun ./index.html",
+    "build": "bun run derive && bun scripts/build.ts",
+    "derive": "bun scripts/derive.ts",
+    "update-data": "bun scripts/update-data.ts",
+    "preview": "bun scripts/preview.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome check --write ."
+  },
+  "dependencies": {
+    "chart.js": "^4.6.1",
+    "preact": "^11.2.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.6",
+    "@types/bun": "^1.4.4",
+    "typescript": "^7.0.2"
+  }
+}
