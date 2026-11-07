@@ -87,13 +87,8 @@ jobs:
             exit 0
           fi
           latest=$(jq -r '.months[-1]' src/generated/series.json)
-          branch="${BRANCH_PREFIX}$(date -u +%Y-%m-%d)-${GITHUB_RUN_ID}"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git switch -c "$branch"
-          git add data/stars
-          git commit -m "data: Update star history (through $latest)"
-          git push origin "$branch"
+          # Write the body before pushing, so a failure here cannot leave a
+          # pushed branch without a pull request.
           {
             echo "Automated update from \`bun run update-data\` (data through $latest)."
             echo
@@ -101,7 +96,7 @@ jobs:
             echo "Select **Approve workflows to run** to run the checks here, then merge to deploy."
             echo
             echo '```'
-            grep -E '^(Wrote|Top 10)' "$RUNNER_TEMP/build.log"
+            grep -E '^(Wrote|Top 10)' "$RUNNER_TEMP/build.log" || true
             echo '```'
             echo
             echo '<details><summary>update-data log</summary>'
@@ -111,6 +106,13 @@ jobs:
             echo '```'
             echo '</details>'
           } > "$RUNNER_TEMP/body.md"
+          branch="${BRANCH_PREFIX}$(date -u +%Y-%m-%d)-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add data/stars
+          git commit -m "data: Update star history (through $latest)"
+          git push origin "$branch"
           gh pr create --base main --head "$branch" \
             --title "data: Update star history (through $latest)" \
             --body-file "$RUNNER_TEMP/body.md"
