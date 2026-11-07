@@ -3,10 +3,15 @@
 // a free slot (?f=,vue), so every line keeps its color after a reload.
 
 import { type Category, categories } from "../../data/categories";
-import { maxSelected, type Slots, slotsFromIds } from "./selection";
+import { type Slots, selectedIds, slotsFromIds } from "./selection";
 
-export type Scale = "linear" | "log";
+export const scales = ["linear", "log"] as const;
+export type Scale = (typeof scales)[number];
 export type CategoryFilter = Category | "all";
+
+export function inCategory(framework: { category: Category }, filter: CategoryFilter): boolean {
+  return filter === "all" || framework.category === filter;
+}
 
 export interface UrlState {
   slots: Slots;
@@ -20,16 +25,13 @@ export function parseUrlState(search: string, knownIds: ReadonlySet<string>): Pa
   const state: Partial<UrlState> = {};
   const ids = params.get("f");
   if (ids !== null) {
-    const known = ids
-      .split(",")
-      .slice(0, maxSelected)
-      .map((id) => (knownIds.has(id) ? id : null));
+    const slots = slotsFromIds(ids.split(",").map((id) => (knownIds.has(id) ? id : null)));
     // "f=" is a deliberately empty chart, but a link whose ids are all unknown
     // (for example after a rename) falls back to the default selection.
-    if (ids === "" || known.some((id) => id !== null)) state.slots = slotsFromIds(known);
+    if (ids === "" || selectedIds(slots).length > 0) state.slots = slots;
   }
   const scale = params.get("scale");
-  if (scale === "linear" || scale === "log") state.scale = scale;
+  if ((scales as readonly string[]).includes(scale ?? "")) state.scale = scale as Scale;
   const category = params.get("cat");
   if (category === "all" || (categories as readonly string[]).includes(category ?? "")) {
     state.category = category as CategoryFilter;

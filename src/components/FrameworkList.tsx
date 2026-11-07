@@ -1,25 +1,22 @@
+import { useState } from "preact/hooks";
 import { type Category, categories, categoryLabels } from "../../data/categories";
 import { formatShare } from "../format";
 import { slotStyle } from "../lib/colors";
-import type { Slots } from "../lib/selection";
+import { maxSelected, type Slots } from "../lib/selection";
 import type { FrameworkSeries } from "../lib/types";
-import type { CategoryFilter, Scale } from "../lib/url-state";
+import { type CategoryFilter, inCategory, type Scale, scales } from "../lib/url-state";
 
 interface Props {
   frameworks: FrameworkSeries[];
   slots: Slots;
   category: CategoryFilter;
-  search: string;
-  trimmed: boolean;
   scale: Scale;
   notice: string | null;
   onToggle: (id: string) => void;
   onHighlight: (id: string | null) => void;
   onCategory: (category: CategoryFilter) => void;
-  onSearch: (search: string) => void;
   onReset: () => void;
   onEmpty: () => void;
-  onTrim: () => void;
   onScale: (scale: Scale) => void;
 }
 
@@ -55,10 +52,8 @@ function ChoiceGroup<Value extends string>(props: {
   );
 }
 
-const scales: { value: Scale; label: string }[] = [
-  { value: "linear", label: "Linear" },
-  { value: "log", label: "Log" },
-];
+const scaleLabels: Record<Scale, string> = { linear: "Linear", log: "Log" };
+const scaleOptions = scales.map((value) => ({ value, label: scaleLabels[value] }));
 
 function RankChange({ change }: { change: number | null }) {
   if (change === null) return <span class="change new">new</span>;
@@ -69,11 +64,13 @@ function RankChange({ change }: { change: number | null }) {
 }
 
 export function FrameworkList(props: Props) {
-  const { frameworks, slots, category, search, trimmed, scale, notice } = props;
+  const { frameworks, slots, category, scale, notice } = props;
+  const [search, setSearch] = useState("");
+  const [trimmed, setTrimmed] = useState(false);
   const query = search.trim().toLowerCase();
   const visible = frameworks.filter(
     (framework) =>
-      (category === "all" || framework.category === category) &&
+      inCategory(framework, category) &&
       (!trimmed || slots.includes(framework.id)) &&
       framework.name.toLowerCase().includes(query),
   );
@@ -94,14 +91,20 @@ export function FrameworkList(props: Props) {
         placeholder="Filter by name"
         aria-label="Filter frameworks by name"
         value={search}
-        onInput={(event) => props.onSearch(event.currentTarget.value)}
+        onInput={(event) => {
+          setSearch(event.currentTarget.value);
+          setTrimmed(false);
+        }}
       />
       <div class="tools">
         <button
           type="button"
           class="button"
-          onClick={props.onReset}
-          title="Select the top 10 in this category"
+          onClick={() => {
+            setSearch("");
+            props.onReset();
+          }}
+          title={`Select the top ${maxSelected} in this category`}
         >
           Reset
         </button>
@@ -112,7 +115,7 @@ export function FrameworkList(props: Props) {
           type="button"
           class="button"
           aria-pressed={trimmed}
-          onClick={props.onTrim}
+          onClick={() => setTrimmed((value) => !value)}
           title="Show only selected frameworks"
         >
           Trim
@@ -121,7 +124,7 @@ export function FrameworkList(props: Props) {
           class="segmented"
           name="scale"
           legend="Y axis scale"
-          options={scales}
+          options={scaleOptions}
           value={scale}
           onChange={props.onScale}
         />

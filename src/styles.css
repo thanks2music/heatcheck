@@ -11,6 +11,8 @@
   --up: #6fcf97;
   --down: #f08a8a;
   --warning: #f0b24a;
+  --chart-grid: rgb(240 239 236 / 8%);
+  --chart-rule: rgb(240 239 236 / 35%);
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   background: var(--surface);
   color: var(--text);

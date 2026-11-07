@@ -1,11 +1,17 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { seriesData } from "../data";
 import { slotStyle } from "../lib/colors";
 import { maxSelected, type Slots, slotsFromIds, toggleSlot } from "../lib/selection";
-import { type CategoryFilter, parseUrlState, type Scale, serializeUrlState } from "../lib/url-state";
+import {
+  type CategoryFilter,
+  inCategory,
+  parseUrlState,
+  type Scale,
+  serializeUrlState,
+} from "../lib/url-state";
 import { FrameworkList } from "./FrameworkList";
 import { Header } from "./Header";
-import { type ChartLine, TrendChart } from "./TrendChart";
+import { type ChartHandle, type ChartLine, TrendChart } from "./TrendChart";
 
 const { months, frameworks } = seriesData;
 const byId = new Map(frameworks.map((framework) => [framework.id, framework]));
@@ -13,7 +19,7 @@ const lastMonth = months.at(-1) ?? "";
 
 function topIds(category: CategoryFilter): string[] {
   return frameworks
-    .filter((framework) => category === "all" || framework.category === category)
+    .filter((framework) => inCategory(framework, category))
     .slice(0, maxSelected)
     .map((framework) => framework.id);
 }
@@ -25,10 +31,8 @@ export function App() {
   const [slots, setSlots] = useState<Slots>(initial.slots ?? defaultSlots);
   const [scale, setScale] = useState<Scale>(initial.scale ?? "linear");
   const [category, setCategory] = useState<CategoryFilter>(initial.category ?? "all");
-  const [search, setSearch] = useState("");
-  const [trimmed, setTrimmed] = useState(false);
-  const [highlighted, setHighlighted] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const chart = useRef<ChartHandle>(null);
 
   // Keep the address bar a permalink of the current view.
   useEffect(() => {
@@ -45,10 +49,6 @@ export function App() {
     [slots],
   );
 
-  // A row can be deselected while it is hovered or focused; ignore a highlight
-  // for a line that is no longer drawn, or every other line would stay dimmed.
-  const activeHighlight = highlighted !== null && slots.includes(highlighted) ? highlighted : null;
-
   const toggle = (id: string) => {
     const result = toggleSlot(slots, id);
     setNotice(result.full ? `Up to ${maxSelected} frameworks at a time. Deselect one first.` : null);
@@ -60,7 +60,7 @@ export function App() {
       <Header lastMonth={lastMonth} frameworkCount={frameworks.length} />
       <main class="main">
         <section class="chart-panel" aria-label="Chart">
-          <TrendChart months={months} lines={lines} scale={scale} highlighted={activeHighlight} />
+          <TrendChart months={months} lines={lines} scale={scale} handle={chart} />
           <p class="chart-note">
             Stars show attention on GitHub, not how many people use a framework. A single month of burst
             starring is ignored by the 3-month median. <abbr title="Official GitHub mirror">M</abbr> marks
@@ -71,27 +71,19 @@ export function App() {
           frameworks={frameworks}
           slots={slots}
           category={category}
-          search={search}
-          trimmed={trimmed}
           scale={scale}
           notice={notice}
           onToggle={toggle}
-          onHighlight={setHighlighted}
+          onHighlight={(id) => chart.current?.highlight(id)}
           onCategory={setCategory}
-          onSearch={(value) => {
-            setSearch(value);
-            setTrimmed(false);
-          }}
           onReset={() => {
             setSlots(slotsFromIds(topIds(category)));
-            setSearch("");
             setNotice(null);
           }}
           onEmpty={() => {
             setSlots(slotsFromIds([]));
             setNotice(null);
           }}
-          onTrim={() => setTrimmed((value) => !value)}
           onScale={setScale}
         />
       </main>
