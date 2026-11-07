@@ -146,6 +146,9 @@ async function main() {
     }
   }
 
+  // Any failure fails the run, so no pull request is opened. Publishing the
+  // rest would leave some frameworks a month behind and skew every share;
+  // the failed workflow run is the signal to retry.
   if (failures.length) {
     throw new Error(`Failed to update ${failures.length} repositories:\n${failures.join("\n")}`);
   }
