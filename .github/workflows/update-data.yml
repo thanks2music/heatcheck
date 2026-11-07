@@ -1,0 +1,116 @@
+name: Update data
+
+# Once a month, fetch the latest star history and open a pull request with it.
+# Stars change every month, so a normal run always opens one.
+#
+# The pull request is created with GITHUB_TOKEN, which requires the repository
+# setting "Allow GitHub Actions to create and approve pull requests". Checks on
+# that pull request wait for "Approve workflows to run" before they start, so
+# this workflow builds the site itself before opening the pull request.
+
+on:
+  schedule:
+    # 03:17 UTC on the 3rd; GitHub recommends avoiding the start of the hour.
+    - cron: "17 3 3 * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+defaults:
+  run:
+    # An explicit bash shell runs with -eo pipefail, so a failing
+    # `bun run update-data | tee` fails the step.
+    shell: bash
+
+env:
+  BRANCH_PREFIX: data/stars-
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    outputs:
+      open: ${{ steps.open.outputs.count }}
+    steps:
+      - name: Count open update pull requests
+        id: open
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          open=$(gh pr list --state open --limit 1000 --json headRefName \
+            --jq "[.[] | select(.headRefName | startswith(\"$BRANCH_PREFIX\"))] | length")
+          echo "count=$open" >> "$GITHUB_OUTPUT"
+          if [ "$open" != "0" ]; then
+            echo "::notice::An update pull request is already open; skipping."
+          fi
+
+  update:
+    needs: check
+    if: needs.check.outputs.open == '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Update data
+        env:
+          # Raises the API limit to 1,000 requests an hour; a monthly run needs about one per repository.
+          GH_TOKEN: ${{ github.token }}
+        run: bun run update-data | tee "$RUNNER_TEMP/update-data.log"
+
+      - name: Build
+        run: bun run build | tee "$RUNNER_TEMP/build.log"
+
+      - name: Open pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- data/stars; then
+            echo "::notice::No changes in data/stars."
+            exit 0
+          fi
+          latest=$(jq -r '.months[-1]' src/generated/series.json)
+          branch="${BRANCH_PREFIX}$(date -u +%Y-%m-%d)-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add data/stars
+          git commit -m "data: Update star history (through $latest)"
+          git push origin "$branch"
+          {
+            echo "Automated update from \`bun run update-data\` (data through $latest)."
+            echo
+            echo "The site built successfully with this data in the workflow run that opened this pull request."
+            echo "Select **Approve workflows to run** to run the checks here, then merge to deploy."
+            echo
+            echo '```'
+            grep -E '^(Wrote|Top 10)' "$RUNNER_TEMP/build.log"
+            echo '```'
+            echo
+            echo '<details><summary>update-data log</summary>'
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/update-data.log"
+            echo '```'
+            echo '</details>'
+          } > "$RUNNER_TEMP/body.md"
+          gh pr create --base main --head "$branch" \
+            --title "data: Update star history (through $latest)" \
+            --body-file "$RUNNER_TEMP/body.md"
