@@ -1,0 +1,69 @@
+name: Claude Code Review
+
+# Reviews each pull request in Japanese with anthropics/claude-code-action and
+# posts the findings as PR comments.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# push 連打時に古いレビュー実行をキャンセルし、重複コメント・コスト増を防ぐ
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  claude-review:
+    # - fork からの PR は secret が渡らないためスキップ
+    # - bot (dependabot / renovate / Copilot 等) が起動した run は action が既定で拒否し失敗するためスキップ
+    #   (Copilot は actor 名に [bot] が付かないため個別に除外)
+    #   (bot にもレビューさせたい場合は、この条件を外して with: に allowed_bots を指定する)
+    if: |
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !endsWith(github.actor, '[bot]') &&
+      github.actor != 'Copilot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # この permissions が絞るのは GITHUB_TOKEN だけ。コメント投稿は Claude GitHub App のトークン
+    # (権限は App 側で決まる) で行うため、pull-requests は read で足りる (2026-09 実測で確認)
+    permissions:
+      contents: read
+      pull-requests: read
+      id-token: write # Claude GitHub App のトークン交換 (OIDC) に必須
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          # Claude サブスクリプション (Pro / Max / Team / Enterprise) の `claude setup-token` で発行したトークン。
+          # Claude Console の API キーを使う場合は `anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}` に置き換える
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            この Pull Request を日本語でレビューしてください。観点:
+            - コード品質・ベストプラクティス
+            - 潜在的なバグ・問題
+            - セキュリティ上の懸念
+            - パフォーマンス
+            - ドキュメント / 設定の場合は正確性・公式仕様や一次情報との整合
+            - リポジトリに CLAUDE.md があれば、その規約との整合
+
+            PR ブランチは作業ディレクトリにチェックアウト済みです。
+            差分が大きく `gh pr diff` の出力が切り詰められる場合は、
+            Read / Grep / Glob でチェックアウト済みのファイルを直接読むこと。
+            全体的な所感は `gh pr comment`、特定箇所の指摘は
+            `mcp__github_inline_comment__create_inline_comment` (confirmed: true) を使用。
+            問題がなければその旨を `gh pr comment` で明示すること。
+            レビューは GitHub 上にのみ投稿すること。
+          # 投稿ツールの明示許可。automation mode (prompt 指定時) では許可したツールしか使えず、
+          # inline コメント用の MCP サーバーもここに名前がある時だけ起動する。
+          # 無いと run は SUCCESS のままコメントが一切投稿されない
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep,Glob"
