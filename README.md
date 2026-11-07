@@ -1,7 +1,7 @@
 # heatcheck &mdash; Framework Trends
 
 > "In Northeast Ohio, nothing is given. Everything is earned."
-> — LeBron James, [*Sports Illustrated*](https://www.si.com/nba/2014/07/11/lebron-james-cleveland-cavaliers) (2014)
+> — LeBron James, [_Sports Illustrated_](https://www.si.com/nba/2014/07/11/lebron-james-cleveland-cavaliers) (2014)
 
 **Live site:** https://thanks2music.github.io/heatcheck/
 
@@ -26,7 +26,7 @@ The y axis is **each framework's share of new stars**. For every month, heatchec
 - **Stars measure attention, not use.** A star means someone on GitHub noticed a project. It says nothing about how many teams run it in production, and it leans toward what is new and talked about.
 - **Bursts are dampened, not removed.** Stars sometimes arrive in bursts: a launch, a viral post, or a fake-star campaign ([a 2024 study](https://arxiv.org/abs/2412.13459) found these rising, especially around AI/LLM repositories). The three-month median ignores a single burst month, but two burst months in a row still show.
 - **Shares are relative to this list.** Adding or removing a framework changes everyone else's share a little.
-- **Removed stars disappear from history.** GitHub's history counts the stars a repository has today, so when someone unstars a project, that star leaves the month it was given.
+- **Removed stars disappear from history.** A repository's weekly counts add up to its current star count, so a star that is later removed no longer shows in the month it was given.
 - **Mirrors undercount.** WordPress and Qt are developed outside GitHub and only mirrored there, so fewer people star them. They are marked **M**.
 - **Some frameworks use more than one repository.** Vue (`vuejs/core` and `vuejs/vue`) and Laravel (`laravel/laravel` and `laravel/framework`) add up both, so someone who starred both counts twice.
 - **Rank change compares last month with the same month a year earlier.** "new" means the framework had no stars a year ago.
