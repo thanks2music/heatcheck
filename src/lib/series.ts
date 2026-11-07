@@ -10,9 +10,15 @@ export function monthOf(date: Date): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-export function addMonths(month: string, count: number): string {
+/** Months since year 0 for "YYYY-MM", so month arithmetic is plain subtraction. */
+export function monthIndex(month: string): number {
   const [year, mon] = month.split("-").map(Number) as [number, number];
-  return monthOf(new Date(Date.UTC(year, mon - 1 + count, 1)));
+  return year * 12 + mon - 1;
+}
+
+export function addMonths(month: string, count: number): string {
+  const index = monthIndex(month) + count;
+  return `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, "0")}`;
 }
 
 /** Inclusive list of months from `from` to `to`. */

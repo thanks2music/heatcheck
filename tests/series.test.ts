@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   addMonths,
   columnShares,
+  monthIndex,
   monthlyTotals,
   monthOf,
   monthRange,
@@ -20,6 +21,10 @@ describe("months", () => {
   test("addMonths rolls over years both ways", () => {
     expect(addMonths("2026-11", 2)).toBe("2027-01");
     expect(addMonths("2015-01", -2)).toBe("2014-11");
+  });
+
+  test("monthIndex makes month arithmetic a subtraction", () => {
+    expect(monthIndex("2027-01") - monthIndex("2026-10")).toBe(3);
   });
 
   test("monthRange is inclusive", () => {
