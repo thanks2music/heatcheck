@@ -23,7 +23,6 @@ import { orphanedStarsFiles, readStarsFile, writeFetchedAt, writeStarsFile } fro
 const apiVersion = "2026-03-10";
 const perPage = 30;
 const maxPages = 100;
-const concurrency = 6;
 const maxAttempts = 3;
 
 const weekSchema = z
@@ -50,24 +49,47 @@ async function fetchPage(repo: string, page: number): Promise<Week[]> {
   if (token) headers.Authorization = `Bearer ${token}`;
 
   for (let attempt = 1; ; attempt++) {
-    const response = await fetch(url, { headers });
+    let response: Response;
+    try {
+      response = await fetch(url, { headers });
+    } catch (error) {
+      if (attempt === maxAttempts) throw error;
+      await Bun.sleep(2 ** attempt * 1000);
+      continue;
+    }
     if (response.ok) {
       return pageSchema.parse(await response.json());
     }
     const body = (await response.text()).slice(0, 300);
-    const remaining = response.headers.get("x-ratelimit-remaining");
-    if (remaining === "0") {
+    if (response.headers.get("x-ratelimit-remaining") === "0") {
+      // The primary limit resets on the hour; stop instead of waiting that long.
       const reset = new Date(Number(response.headers.get("x-ratelimit-reset")) * 1000);
       throw new Error(
         `Rate limit exhausted at ${repo} page ${page}; resets at ${reset.toISOString()}.` +
           (token ? "" : " Set GH_TOKEN to raise the limit."),
       );
     }
-    if (response.status < 500 || attempt === maxAttempts) {
+    const waitSeconds = retryDelaySeconds(response, body, attempt);
+    if (waitSeconds === undefined || attempt === maxAttempts) {
       throw new Error(`${repo} page ${page}: HTTP ${response.status} ${body}`);
     }
-    await Bun.sleep(2 ** attempt * 1000);
+    await Bun.sleep(waitSeconds * 1000);
   }
+}
+
+/**
+ * How long to wait before retrying, per GitHub's guidance on rate limit
+ * errors: honor `retry-after`, otherwise wait at least a minute for a
+ * secondary rate limit. Server errors back off briefly. Undefined means the
+ * error will not go away by retrying.
+ * https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api#handle-rate-limit-errors-appropriately
+ */
+function retryDelaySeconds(response: Response, body: string, attempt: number): number | undefined {
+  const retryAfter = Number(response.headers.get("retry-after"));
+  if (retryAfter > 0) return retryAfter;
+  if (response.status === 429 || (response.status === 403 && /rate limit/i.test(body))) return 60;
+  if (response.status >= 500) return 2 ** attempt;
+  return undefined;
 }
 
 /**
@@ -111,18 +133,16 @@ async function main() {
     `Updating ${repos.length} repositories${full ? " (full history)" : ""}${token ? "" : " without a token"}`,
   );
 
-  const queue = [...repos];
+  // One request at a time: GitHub asks clients to "make requests serially
+  // instead of concurrently" to stay clear of secondary rate limits.
   const failures: string[] = [];
-  const worker = async () => {
-    for (let repo = queue.shift(); repo; repo = queue.shift()) {
-      try {
-        console.log(`  ${await updateRepo(repo, full)}`);
-      } catch (error) {
-        failures.push(`${repo}: ${error instanceof Error ? error.message : String(error)}`);
-      }
+  for (const repo of repos) {
+    try {
+      console.log(`  ${await updateRepo(repo, full)}`);
+    } catch (error) {
+      failures.push(`${repo}: ${error instanceof Error ? error.message : String(error)}`);
     }
-  };
-  await Promise.all(Array.from({ length: concurrency }, worker));
+  }
 
   if (failures.length) {
     throw new Error(`Failed to update ${failures.length} repositories:\n${failures.join("\n")}`);
