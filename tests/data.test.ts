@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { categories } from "../data/categories";
 import { frameworkListSchema, frameworks } from "../data/frameworks";
 import { derive, firstMonth } from "../scripts/derive";
 import { mergeWeeks } from "../scripts/update-data";
@@ -7,8 +8,8 @@ import type { WeekRow } from "../src/lib/series";
 describe("frameworks list", () => {
   test("the shipped list is valid and covers every category", () => {
     expect(frameworks.length).toBeGreaterThanOrEqual(90);
-    const categories = new Set(frameworks.map((framework) => framework.category));
-    expect(categories.size).toBe(4);
+    const used = new Set(frameworks.map((framework) => framework.category));
+    expect(used.size).toBe(categories.length);
   });
 
   test("duplicate ids and repositories are rejected", () => {
@@ -33,7 +34,7 @@ describe("mergeWeeks", () => {
       [100, 1, 1, 1, 1, 1, 1, 1],
       [200, 2, 2, 2, 2, 2, 2, 2],
     ];
-    const fetched = [
+    const fetched: Parameters<typeof mergeWeeks>[1] = [
       { week: 300, total: 7, days: [1, 1, 1, 1, 1, 1, 1] },
       { week: 200, total: 0, days: [0, 0, 0, 0, 0, 0, 0] },
     ];

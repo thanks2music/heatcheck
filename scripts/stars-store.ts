@@ -5,15 +5,13 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import type { WeekRow } from "../src/lib/series";
 
 export const starsDir = join(import.meta.dir, "../data/stars");
 const metaPath = join(starsDir, "_meta.json");
 
-const weekRowSchema = z
-  .array(z.number().int().nonnegative())
-  .length(8)
-  .transform((row) => row as unknown as WeekRow);
+const count = z.number().int().nonnegative();
+/** Same shape as WeekRow in src/lib/series.ts: [weekStart, sun, mon, ..., sat]. */
+const weekRowSchema = z.tuple([z.number().int(), count, count, count, count, count, count, count]).readonly();
 
 const starsFileSchema = z.object({
   repo: z.string(),
@@ -22,10 +20,7 @@ const starsFileSchema = z.object({
 
 const metaSchema = z.object({ fetchedAt: z.iso.datetime() });
 
-export interface StarsFile {
-  repo: string;
-  weeks: WeekRow[];
-}
+export type StarsFile = z.infer<typeof starsFileSchema>;
 
 export function starsPath(repo: string): string {
   return join(starsDir, `${repo.toLowerCase().replace("/", "__")}.json`);

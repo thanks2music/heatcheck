@@ -25,11 +25,12 @@ const perPage = 30;
 const maxPages = 100;
 const maxAttempts = 3;
 
+const count = z.number().int().nonnegative();
 const weekSchema = z
   .object({
     week: z.number().int(),
-    total: z.number().int().nonnegative(),
-    days: z.array(z.number().int().nonnegative()).length(7),
+    total: count,
+    days: z.tuple([count, count, count, count, count, count, count]),
   })
   .refine((week) => week.days.reduce((sum, count) => sum + count, 0) === week.total, {
     message: "total does not equal the sum of days",
@@ -38,6 +39,9 @@ const pageSchema = z.array(weekSchema).max(perPage);
 type Week = z.infer<typeof weekSchema>;
 
 const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+
+/** The primary rate limit is spent; every further request would fail too. */
+class RateLimitExhausted extends Error {}
 
 async function fetchPage(repo: string, page: number): Promise<Week[]> {
   const url = `https://api.github.com/repos/${repo}/stargazers/history?per_page=${perPage}&page=${page}`;
@@ -49,29 +53,25 @@ async function fetchPage(repo: string, page: number): Promise<Week[]> {
   if (token) headers.Authorization = `Bearer ${token}`;
 
   for (let attempt = 1; ; attempt++) {
-    let response: Response;
-    try {
-      response = await fetch(url, { headers });
-    } catch (error) {
-      if (attempt === maxAttempts) throw error;
-      await Bun.sleep(2 ** attempt * 1000);
-      continue;
-    }
-    if (response.ok) {
+    const response = await fetch(url, { headers }).catch((error: unknown) =>
+      error instanceof Error ? error : new Error(String(error)),
+    );
+    if (!(response instanceof Error) && response.ok) {
       return pageSchema.parse(await response.json());
     }
-    const body = (await response.text()).slice(0, 300);
-    if (response.headers.get("x-ratelimit-remaining") === "0") {
-      // The primary limit resets on the hour; stop instead of waiting that long.
+    const body = response instanceof Error ? response.message : (await response.text()).slice(0, 300);
+    if (!(response instanceof Error) && response.headers.get("x-ratelimit-remaining") === "0") {
+      // The primary limit resets on the hour; stop the run instead of waiting that long.
       const reset = new Date(Number(response.headers.get("x-ratelimit-reset")) * 1000);
-      throw new Error(
+      throw new RateLimitExhausted(
         `Rate limit exhausted at ${repo} page ${page}; resets at ${reset.toISOString()}.` +
           (token ? "" : " Set GH_TOKEN to raise the limit."),
       );
     }
     const waitSeconds = retryDelaySeconds(response, body, attempt);
     if (waitSeconds === undefined || attempt === maxAttempts) {
-      throw new Error(`${repo} page ${page}: HTTP ${response.status} ${body}`);
+      const status = response instanceof Error ? "request failed" : `HTTP ${response.status}`;
+      throw new Error(`${repo} page ${page}: ${status} ${body}`);
     }
     await Bun.sleep(waitSeconds * 1000);
   }
@@ -80,11 +80,12 @@ async function fetchPage(repo: string, page: number): Promise<Week[]> {
 /**
  * How long to wait before retrying, per GitHub's guidance on rate limit
  * errors: honor `retry-after`, otherwise wait at least a minute for a
- * secondary rate limit. Server errors back off briefly. Undefined means the
- * error will not go away by retrying.
+ * secondary rate limit. Network and server errors back off briefly.
+ * Undefined means the error will not go away by retrying.
  * https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api#handle-rate-limit-errors-appropriately
  */
-function retryDelaySeconds(response: Response, body: string, attempt: number): number | undefined {
+function retryDelaySeconds(response: Response | Error, body: string, attempt: number): number | undefined {
+  if (response instanceof Error) return 2 ** attempt;
   const retryAfter = Number(response.headers.get("retry-after"));
   if (retryAfter > 0) return retryAfter;
   if (response.status === 429 || (response.status === 403 && /rate limit/i.test(body))) return 60;
@@ -112,7 +113,7 @@ async function fetchWeeks(repo: string, untilWeek: number | undefined): Promise<
 export function mergeWeeks(stored: readonly WeekRow[], fetched: readonly Week[]): WeekRow[] {
   const byWeek = new Map<number, WeekRow>(stored.map((row) => [row[0], row]));
   for (const { week, days } of fetched) {
-    byWeek.set(week, [week, ...days] as unknown as WeekRow);
+    byWeek.set(week, [week, ...days]);
   }
   return [...byWeek.values()].sort((a, b) => a[0] - b[0]);
 }
@@ -140,6 +141,7 @@ async function main() {
     try {
       console.log(`  ${await updateRepo(repo, full)}`);
     } catch (error) {
+      if (error instanceof RateLimitExhausted) throw error;
       failures.push(`${repo}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
