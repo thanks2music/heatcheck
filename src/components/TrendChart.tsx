@@ -89,16 +89,19 @@ function yearStep(width: number): number {
   return width < 480 ? 3 : width < 760 ? 2 : 1;
 }
 
-function toDataset(line: ChartLine, scale: Scale, highlighted: string | null): ChartDataset<"line"> {
+/** The parts of a line's look that change when a row in the list is hovered. */
+function highlightStyle(line: ChartLine, highlighted: string | null) {
   const dimmed = highlighted !== null && highlighted !== line.id;
   const color = dimmed ? `${line.style.color}${dimAlpha}` : line.style.color;
+  return { borderColor: color, backgroundColor: color, borderWidth: highlighted === line.id ? 4 : 2 };
+}
+
+function toDataset(line: ChartLine, scale: Scale, highlighted: string | null): ChartDataset<"line"> {
   return {
     label: line.name,
     // A log axis cannot place zero; leave a gap until the framework has stars.
     data: scale === "log" ? line.share.map((value) => (value > 0 ? value : null)) : line.share,
-    borderColor: color,
-    backgroundColor: color,
-    borderWidth: highlighted === line.id ? 4 : 2,
+    ...highlightStyle(line, highlighted),
     borderDash: line.style.dashed ? [6, 4] : [],
     pointRadius: 0,
     pointHoverRadius: 4,
@@ -110,9 +113,11 @@ function toDataset(line: ChartLine, scale: Scale, highlighted: string | null): C
 export function TrendChart({ months, lines, scale, highlighted }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const chart = useRef<Chart<"line"> | null>(null);
-  // The tooltip callbacks read the current lines, not the ones from the first render.
+  // Callbacks and effects read the current props, not the ones from the render that created them.
   const currentLines = useRef(lines);
   currentLines.current = lines;
+  const currentHighlight = useRef(highlighted);
+  currentHighlight.current = highlighted;
 
   useEffect(() => {
     if (!canvas.current) return;
@@ -165,13 +170,25 @@ export function TrendChart({ months, lines, scale, highlighted }: Props) {
     };
   }, [months]);
 
+  // New lines or a new scale: rebuild the datasets and animate the change.
   useEffect(() => {
     const instance = chart.current;
     if (!instance) return;
-    instance.data.datasets = lines.map((line) => toDataset(line, scale, highlighted));
+    instance.data.datasets = lines.map((line) => toDataset(line, scale, currentHighlight.current));
     if (instance.options.scales) instance.options.scales.y = yScale(scale);
     instance.update();
-  }, [lines, scale, highlighted]);
+  }, [lines, scale]);
+
+  // Hovering the list only restyles the existing lines, without animation.
+  useEffect(() => {
+    const instance = chart.current;
+    if (!instance) return;
+    instance.data.datasets.forEach((dataset, index) => {
+      const line = currentLines.current[index];
+      if (line) Object.assign(dataset, highlightStyle(line, highlighted));
+    });
+    instance.update("none");
+  }, [highlighted]);
 
   const names = lines.map((line) => line.name).join(", ");
   return (
