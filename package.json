@@ -18,7 +18,7 @@
     "update-data": "bun scripts/update-data.ts",
     "preview": "bun scripts/preview.ts",
     "test": "bun test",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "bun run derive && tsc --noEmit",
     "lint": "biome check .",
     "format": "biome check --write ."
   },

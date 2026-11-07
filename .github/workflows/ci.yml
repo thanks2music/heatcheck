@@ -30,10 +30,6 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # Typecheck needs src/generated/series.json, which derive writes.
-      - name: Derive chart data
-        run: bun run derive
-
       - name: Typecheck
         run: bun run typecheck
 
