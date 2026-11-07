@@ -60,7 +60,7 @@ export function App() {
           <p class="chart-note">
             Stars show attention on GitHub, not how many people use a framework. A single month of burst
             starring is ignored by the 3-month median. <abbr title="Official GitHub mirror">M</abbr> marks
-            mirrors of projects developed elsewhere.
+            official mirrors of projects developed elsewhere, whose stars may undercount.
           </p>
         </section>
         <FrameworkList

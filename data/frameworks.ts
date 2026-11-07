@@ -6,9 +6,9 @@
 //   mirror (set `mirror: true`; stars on a mirror tend to undercount).
 // - The repository is not archived. Use the canonical owner/name that
 //   `gh api repos/{owner}/{repo} --jq .full_name` returns.
-// - List several repositories only when one framework moved between them
-//   (for example Vue 2 and Vue 3). Their stars are added together, so someone
-//   who starred both is counted twice.
+// - List several repositories when one framework moved between them (Vue 2
+//   and Vue 3) or is split across them (Laravel's skeleton and framework).
+//   Their stars are added together, so someone who starred both counts twice.
 
 import { z } from "zod";
 import { categories } from "./categories";
