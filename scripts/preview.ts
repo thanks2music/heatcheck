@@ -14,7 +14,13 @@ const server = Bun.serve({
   async fetch(request) {
     const { pathname } = new URL(request.url);
     if (!pathname.startsWith(base)) return Response.redirect(base, 302);
-    const relative = normalize(decodeURIComponent(pathname.slice(base.length)) || "index.html");
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(pathname.slice(base.length));
+    } catch {
+      return new Response("Bad request", { status: 400 });
+    }
+    const relative = normalize(decoded || "index.html");
     if (relative.startsWith("..")) return new Response("Not found", { status: 404 });
     const file = Bun.file(join(distDir, relative));
     return (await file.exists()) ? new Response(file) : new Response("Not found", { status: 404 });
