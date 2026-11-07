@@ -59,6 +59,7 @@ export function derive(fetchedAt: Date): SeriesData {
 
   const series: FrameworkSeries[] = frameworks.map((framework, index) => {
     const share = shares[index] ?? [];
+    const rank = ranksNow[index] as number;
     return {
       id: framework.id,
       name: framework.name,
@@ -68,8 +69,8 @@ export function derive(fetchedAt: Date): SeriesData {
       ...(framework.note ? { note: framework.note } : {}),
       share: share.map((value) => round(value, 3)),
       stars: (medians[index] ?? []).map((value) => Math.round(value)),
-      rank: ranksNow[index] as number,
-      rankChange: rankChange(ranksNow[index] as number, ranksBefore[index] as number, share[yearAgo] ?? 0),
+      rank,
+      rankChange: rankChange(rank, ranksBefore[index] as number, share[yearAgo] ?? 0),
     };
   });
   series.sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name));

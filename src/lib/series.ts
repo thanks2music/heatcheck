@@ -69,6 +69,9 @@ export function columnShares(rows: readonly (readonly number[])[]): number[][] {
     rows.reduce((sum, row) => sum + (row[column] ?? 0), 0),
   );
   return rows.map((row) =>
-    row.map((value, column) => ((totals[column] ?? 0) > 0 ? (100 * value) / (totals[column] ?? 1) : 0)),
+    row.map((value, column) => {
+      const total = totals[column] ?? 0;
+      return total > 0 ? (100 * value) / total : 0;
+    }),
   );
 }

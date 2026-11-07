@@ -13,8 +13,6 @@
 import { z } from "zod";
 import { categories } from "./categories";
 
-export { type Category, categories, categoryLabels } from "./categories";
-
 const repoName = z.string().regex(/^[A-Za-z0-9-]+\/[A-Za-z0-9_.-]+$/, "expected owner/name");
 
 export const frameworkSchema = z.object({

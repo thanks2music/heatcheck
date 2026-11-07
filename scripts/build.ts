@@ -4,7 +4,7 @@
 // Usage: bun run build (runs derive first)
 
 import { rmSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
 const root = join(import.meta.dir, "..");
 const outdir = join(root, "dist");
@@ -16,5 +16,5 @@ const result = await Bun.build({
   minify: true,
 });
 for (const output of result.outputs) {
-  console.log(`  ${output.path.replace(`${root}/`, "")}  ${(output.size / 1024).toFixed(1)} KB`);
+  console.log(`  ${relative(root, output.path)}  ${(output.size / 1024).toFixed(1)} KB`);
 }
