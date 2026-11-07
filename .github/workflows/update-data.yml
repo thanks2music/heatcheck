@@ -82,7 +82,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if git diff --quiet -- data/stars; then
+          if [ -z "$(git status --porcelain -- data/stars)" ]; then
             echo "::notice::No changes in data/stars."
             exit 0
           fi
