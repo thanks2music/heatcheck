@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { seriesData } from "../data";
 import { slotStyle } from "../lib/colors";
-import { maxSelected, type Slots, selectedIds, slotsFromIds, toggleSlot } from "../lib/selection";
+import { maxSelected, type Slots, slotsFromIds, toggleSlot } from "../lib/selection";
 import { type CategoryFilter, parseUrlState, type Scale, serializeUrlState } from "../lib/url-state";
 import { FrameworkList } from "./FrameworkList";
 import { Header } from "./Header";
@@ -18,11 +18,11 @@ function topIds(category: CategoryFilter): string[] {
     .map((framework) => framework.id);
 }
 
-const defaultIds = topIds("all");
+const defaultSlots = slotsFromIds(topIds("all"));
 const initial = parseUrlState(window.location.search, new Set(byId.keys()));
 
 export function App() {
-  const [slots, setSlots] = useState<Slots>(() => slotsFromIds(initial.selected ?? defaultIds));
+  const [slots, setSlots] = useState<Slots>(initial.slots ?? defaultSlots);
   const [scale, setScale] = useState<Scale>(initial.scale ?? "linear");
   const [category, setCategory] = useState<CategoryFilter>(initial.category ?? "all");
   const [search, setSearch] = useState("");
@@ -32,7 +32,7 @@ export function App() {
 
   // Keep the address bar a permalink of the current view.
   useEffect(() => {
-    const query = serializeUrlState({ selected: selectedIds(slots), scale, category }, defaultIds);
+    const query = serializeUrlState({ slots, scale, category }, defaultSlots);
     window.history.replaceState(null, "", `${window.location.pathname}${query}${window.location.hash}`);
   }, [slots, scale, category]);
 
@@ -45,6 +45,10 @@ export function App() {
     [slots],
   );
 
+  // A row can be deselected while it is hovered or focused; ignore a highlight
+  // for a line that is no longer drawn, or every other line would stay dimmed.
+  const activeHighlight = highlighted !== null && slots.includes(highlighted) ? highlighted : null;
+
   const toggle = (id: string) => {
     const result = toggleSlot(slots, id);
     setNotice(result.full ? `Up to ${maxSelected} frameworks at a time. Deselect one first.` : null);
@@ -56,7 +60,7 @@ export function App() {
       <Header lastMonth={lastMonth} frameworkCount={frameworks.length} />
       <main class="main">
         <section class="chart-panel" aria-label="Chart">
-          <TrendChart months={months} lines={lines} scale={scale} highlighted={highlighted} />
+          <TrendChart months={months} lines={lines} scale={scale} highlighted={activeHighlight} />
           <p class="chart-note">
             Stars show attention on GitHub, not how many people use a framework. A single month of burst
             starring is ignored by the 3-month median. <abbr title="Official GitHub mirror">M</abbr> marks

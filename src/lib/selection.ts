@@ -6,9 +6,15 @@ export const maxSelected = 10;
 /** Framework ids by slot; null is a free slot. Always `maxSelected` long. */
 export type Slots = readonly (string | null)[];
 
-export function slotsFromIds(ids: readonly string[]): Slots {
-  const unique = [...new Set(ids)].slice(0, maxSelected);
-  return Array.from({ length: maxSelected }, (_, index) => unique[index] ?? null);
+/** Slots from ids in slot order; null keeps a slot free, and a repeated id is dropped. */
+export function slotsFromIds(ids: readonly (string | null)[]): Slots {
+  const seen = new Set<string>();
+  return Array.from({ length: maxSelected }, (_, index) => {
+    const id = ids[index] ?? null;
+    if (id === null || seen.has(id)) return null;
+    seen.add(id);
+    return id;
+  });
 }
 
 export function selectedIds(slots: Slots): string[] {

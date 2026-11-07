@@ -10,6 +10,10 @@ test("slotsFromIds dedupes and caps at the maximum", () => {
   expect(selectedIds(slots)).toEqual(ids(10));
 });
 
+test("slotsFromIds keeps free slots in place", () => {
+  expect(slotsFromIds([null, "a", "a", "b"]).slice(0, 4)).toEqual([null, "a", null, "b"]);
+});
+
 test("deselecting frees the slot without moving the others", () => {
   const { slots } = toggleSlot(slotsFromIds(["a", "b", "c"]), "b");
   expect(slots.slice(0, 3)).toEqual(["a", null, "c"]);
